@@ -110,8 +110,9 @@ export function AlertsProvider({ children }) {
   useEffect(() => {
     refreshAlerts({ suppressBanner: true });
 
-    const intervalId = setInterval(() => {
-      refreshAlerts();
+    const intervalId = setInterval(async () => {
+      const userString = await AsyncStorage.getItem('user');
+      if (userString) refreshAlerts();  // only poll if logged in
     }, POLL_INTERVAL_MS);
 
     const appStateSubscription = AppState.addEventListener('change', (nextAppState) => {

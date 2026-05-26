@@ -1,9 +1,10 @@
-import {  View,  Text,  ScrollView,  Pressable,  Animated,  Image,  Modal,  TextInput,  Alert,  ActivityIndicator } from 'react-native'
+import { View, Text, ScrollView, Pressable, Animated, Image, Modal, TextInput, Alert, ActivityIndicator } from 'react-native'
 import { useEffect, useState, useRef } from 'react'
 import { Ionicons } from '@expo/vector-icons'
 import * as ImagePicker from 'expo-image-picker'
 import styles from '../styles/screens/KnownScreenStyles'
 import { API_BASE_URL } from '../config'
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const API_BASE = API_BASE_URL
 const CLOUD_NAME = "diq0bcrjl"
@@ -71,6 +72,7 @@ export default function KnownScreen() {
   const [newName, setNewName] = useState("")
   const [newRelation, setNewRelation] = useState("")
   const [isUploading, setIsUploading] = useState(false)
+  const [userId, setUserId] = useState(null);
 
 
   // ---------- Load faces from backend ----------
@@ -80,36 +82,95 @@ export default function KnownScreen() {
 
   const fetchFaces = async () => {
     try {
-      const res = await fetch(`${API_BASE}/faces`)
-      const data = await res.json()
+      const userString = await AsyncStorage.getItem("user");
+      const user = JSON.parse(userString);
+      const id = user.user_id || user.id;
+      setUserId(id);
 
+      const res = await fetch(`${API_BASE}/faces/user/${id}`);
+      const data = await res.json();
       setPeople(
         data.map(face => ({
           id: face.id.toString(),
           name: face.person_name,
           relation: face.relationship,
-          images: [face.image_url]
+          images: face.image_urls || []   // was face.image_url
         }))
-      )
+      );
     } catch (err) {
-      console.log("Fetch faces error:", err)
+      console.log("Fetch faces error:", err);
     }
-  }
-
+  };
 
   // ---------- Image Picker ----------
   const pickImages = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert("Permission required", "Please allow access to your photo library.");
+      return;
+    }
+
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsMultipleSelection: true,
-      quality: 0.8
-    })
+      mediaTypes: ['images'],
+      allowsMultipleSelection: true,   // re-enable now that we want multiple
+      quality: 0.8,
+    });
 
     if (!result.canceled) {
-      const uris = result.assets.map(a => a.uri)
-      setTempImages(prev => [...prev, ...uris])
+      const uris = result.assets.map(a => a.uri);
+      setTempImages(prev => [...prev, ...uris]);
     }
-  }
+  };
+
+  // ---------- Save Person — send image_urls array ----------
+  const savePerson = async () => {
+    if (!newName || !newRelation || tempImages.length === 0) {
+      Alert.alert("Please fill all fields and add at least one photo");
+      return;
+    }
+
+    setIsUploading(true);
+
+    try {
+      // Upload any local images (not already on cloudinary)
+      const uploadedUrls = await Promise.all(
+        tempImages.map(uri =>
+          uri.startsWith("http") ? uri : uploadToCloudinary(uri)
+        )
+      );
+
+      const payload = {
+        person_name: newName,
+        relationship: newRelation,
+        image_urls: uploadedUrls,   // array now
+        user_id: userId
+      };
+
+      let res;
+      if (editingPersonId) {
+        res = await fetch(`${API_BASE}/faces/${editingPersonId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+      } else {
+        res = await fetch(`${API_BASE}/faces`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+      }
+
+      if (!res.ok) throw new Error("Server error");
+      await fetchFaces();
+      closeModal();
+    } catch (err) {
+      console.log(err);
+      Alert.alert("Upload failed", "Could not save person data.");
+    } finally {
+      setIsUploading(false);
+    }
+  };
 
 
   // ---------- Cloudinary Upload ----------
@@ -135,63 +196,6 @@ export default function KnownScreen() {
     return json.secure_url
   }
 
-
-  // ---------- Save Person ----------
-  // ---------- Save Person ----------
-  const savePerson = async () => {
-    if (!newName || !newRelation || tempImages.length === 0) {
-      Alert.alert("Please fill all fields and add a photo");
-      return;
-    }
-
-    setIsUploading(true);
-
-    try {
-      let imageUrl = tempImages[0];
-
-      // Only upload to Cloudinary if it's a NEW local image (doesn't start with http)
-      if (!imageUrl.startsWith("http")) {
-        imageUrl = await uploadToCloudinary(imageUrl);
-      }
-
-      const payload = {
-        person_name: newName,
-        relationship: newRelation,
-        image_url: imageUrl
-      };
-
-      let res;
-
-      if (editingPersonId) {
-        // UPDATE EXISTING ENTRY
-        res = await fetch(`${API_BASE}/faces/${editingPersonId}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload)
-        });
-      } else {
-        // CREATE NEW ENTRY
-        res = await fetch(`${API_BASE}/faces`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload)
-        });
-      }
-
-      if (!res.ok) {
-        throw new Error("Server responded with an error");
-      }
-
-      await fetchFaces(); // Refresh list
-      closeModal(); // Close and reset
-
-    } catch (err) {
-      console.log(err);
-      Alert.alert("Upload failed", "Could not save person data.");
-    } finally {
-      setIsUploading(false);
-    }
-  };
 
 
   // ---------- Delete ----------
@@ -293,10 +297,40 @@ export default function KnownScreen() {
             {tempImages.length === 0 ? (
               <Pressable style={styles.emptyImageUpload} onPress={pickImages}>
                 <Ionicons name="images-outline" size={40} color="#94A3B8" />
-                <Text style={styles.emptyImageUploadText}>Tap to add photos</Text>
+                <Text style={styles.emptyImageUploadText}>Tap to add photos (multiple angles)</Text>
               </Pressable>
             ) : (
-              <Image source={{ uri: tempImages[0] }} style={styles.imagePreview} />
+              <View>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 8 }}>
+                  {tempImages.map((uri, i) => (
+                    <View key={i} style={{ marginRight: 8, position: 'relative' }}>
+                      <Image source={{ uri }} style={{ width: 80, height: 80, borderRadius: 8 }} />
+                      <Pressable
+                        onPress={() => setTempImages(prev => prev.filter((_, idx) => idx !== i))}
+                        style={{
+                          position: 'absolute', top: -6, right: -6,
+                          backgroundColor: '#EF4444', borderRadius: 10,
+                          width: 20, height: 20, alignItems: 'center', justifyContent: 'center'
+                        }}
+                      >
+                        <Text style={{ color: '#FFF', fontSize: 12, fontWeight: 'bold' }}>×</Text>
+                      </Pressable>
+                    </View>
+                  ))}
+                  <Pressable
+                    onPress={pickImages}
+                    style={{
+                      width: 80, height: 80, borderRadius: 8,
+                      backgroundColor: '#F1F5F9', alignItems: 'center', justifyContent: 'center'
+                    }}
+                  >
+                    <Ionicons name="add" size={28} color="#94A3B8" />
+                  </Pressable>
+                </ScrollView>
+                <Text style={{ color: '#94A3B8', fontSize: 12, marginBottom: 4 }}>
+                  {tempImages.length} photo{tempImages.length > 1 ? 's' : ''} — add different angles for better recognition
+                </Text>
+              </View>
             )}
 
             <TextInput

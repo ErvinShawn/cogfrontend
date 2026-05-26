@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker'; 
 import styles from '../styles/screens/RoutinesScreenStyles';
 import { routineService } from '../services/routineService';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const AnimatedRoutineCard = ({ routine, index, onPress }) => {
   const scaleAnim = useRef(new Animated.Value(1)).current;
@@ -45,17 +46,28 @@ export default function RoutinesScreen() {
   const [newTime, setNewTime] = useState(''); 
   const [showPicker, setShowPicker] = useState(false); 
   const [editingIndex, setEditingIndex] = useState(null); // ✅ Tracks if updating vs adding
+  const [userId, setUserId] = useState(null);
 
   const buttonScale = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
-    loadRoutines();
+    AsyncStorage.getItem("user").then(str => {
+      const u = JSON.parse(str);
+      const id = u.user_id || u.id;
+      setUserId(id);
+    });
   }, []);
+
+  useEffect(() => {
+    if (userId) {
+      loadRoutines();
+    }
+  }, [userId]);
 
   const loadRoutines = async () => {
     try {
       setIsLoading(true);
-      const data = await routineService.getUserRoutines(1); 
+      const data = await routineService.getUserRoutines(userId); 
       if (data && Array.isArray(data)) setRoutines(data);
       else setRoutines([]);
     } catch (error) {
@@ -100,9 +112,9 @@ export default function RoutinesScreen() {
       const stepData = { title: newTitle, description: newDesc, time: newTime };
 
       if (editingIndex !== null) {
-        await routineService.updateReminder(1, editingIndex, stepData);
+        await routineService.updateReminder(userId, editingIndex, stepData);
       } else {
-        await routineService.saveReminder("pi_001", 1, stepData);
+        await routineService.saveReminder("pi_001", userId, stepData);
       }
       
       await loadRoutines(); // Refresh to ensure sync
@@ -119,7 +131,7 @@ export default function RoutinesScreen() {
       { text: "Cancel", style: "cancel" },
       { text: "Delete", style: "destructive", onPress: async () => {
           try {
-            await routineService.deleteReminder(1, editingIndex);
+            await routineService.deleteReminder(userId, editingIndex);
             await loadRoutines();
             closeAndResetModal();
           } catch (e) { Alert.alert("Error", "Could not delete."); }

@@ -6,6 +6,7 @@ import styles from '../styles/screens/SignUpScreenStyles';
 import * as ImagePicker from 'expo-image-picker'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { API_BASE_URL } from '../config'
+import { registerPushToken } from '../services/notification';
 
 export default function SignUpScreen({ navigation }) {
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -97,9 +98,9 @@ export default function SignUpScreen({ navigation }) {
 
     const data = await res.json()
     console.log(data)
-    await AsyncStorage.setItem("user", JSON.stringify(data))
-    navigation.replace("Main")
-
+    await AsyncStorage.setItem("user", JSON.stringify(data));
+    await registerPushToken(data.user_id); // add this
+    navigation.replace("Main");
   } catch (err) {
     console.log("Signup error:", err)
   }
