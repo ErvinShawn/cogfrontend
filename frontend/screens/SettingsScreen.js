@@ -3,8 +3,9 @@ import { useState, useEffect, useRef } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import styles from '../styles/screens/SettingsScreenStyles';
 import { Colors } from '../constants/colors';
-import { deviceService } from '../services/deviceService'; // ✅ Imported the service
-import AsyncStorage from '@react-native-async-storage/async-storage'
+import { deviceService } from '../services/deviceService';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { API_BASE_URL } from '../config';
 
 // ✅ Reusable component for links or actions
 const SettingLink = ({ icon, title, isLast, onPress, isDestructive, valueText }) => (
@@ -43,23 +44,15 @@ const SettingToggle = ({ icon, title, value, onValueChange, isLast }) => (
 );
 
 export default function SettingsScreen({ navigation }) {
-  // State for hardware toggles
   const [objectDetection, setObjectDetection] = useState(true);
   const [faceDetection, setFaceDetection] = useState(true);
-
-  // State for comfort and audio
   const [voicePrompts, setVoicePrompts] = useState(true);
   const [quietHours, setQuietHours] = useState(false);
+  const [linkedDevice, setLinkedDevice] = useState(null);
 
-  // Voice Cycling Logic
   const voices = ['Female (Calm)', 'Female (Standard)', 'Male (Deep)', 'Male (Standard)'];
   const [voiceIndex, setVoiceIndex] = useState(0);
 
-  const cycleVoice = () => {
-    setVoiceIndex((prevIndex) => (prevIndex + 1) % voices.length);
-  };
-
-  // Entrance Animations
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(20)).current;
 
@@ -70,56 +63,105 @@ export default function SettingsScreen({ navigation }) {
     ]).start();
   }, []);
 
-  // ✅ Backend Toggle Handler: Object Detection
+  // Load linked device on mount
+  useEffect(() => {
+    AsyncStorage.getItem("user").then(str => {
+      if (!str) return;
+      const u = JSON.parse(str);
+      const userId = u.user_id || u.id;
+      fetch(`${API_BASE_URL}/devices/user/${userId}`)
+        .then(r => r.json())
+        .then(data => {
+          if (data.length > 0) setLinkedDevice(data[0].device_id);
+        })
+        .catch(err => console.log("Failed to load linked device:", err));
+    });
+  }, []);
+
+  const cycleVoice = () => {
+    setVoiceIndex((prevIndex) => (prevIndex + 1) % voices.length);
+  };
+
   const handleObjectDetectionToggle = async (newValue) => {
-    setObjectDetection(newValue); // Optimistic UI update
+    setObjectDetection(newValue);
     try {
-      await deviceService.updateDevice("pi_001", { object_detection: newValue });
-      console.log(`Object Detection set to: ${newValue}`);
+      await deviceService.updateDevice(linkedDevice || "pi_001", { object_detection: newValue });
     } catch (error) {
-      setObjectDetection(!newValue); // Revert if backend fails
-      Alert.alert("Connection Error", "Failed to update device settings. Please check your network.");
+      setObjectDetection(!newValue);
+      Alert.alert("Connection Error", "Failed to update device settings.");
     }
   };
 
-  // ✅ Backend Toggle Handler: Face Recognition
   const handleFaceDetectionToggle = async (newValue) => {
-    setFaceDetection(newValue); // Optimistic UI update
+    setFaceDetection(newValue);
     try {
-      await deviceService.updateDevice("pi_001", { face_detection: newValue });
-      console.log(`Face Recognition set to: ${newValue}`);
+      await deviceService.updateDevice(linkedDevice || "pi_001", { face_detection: newValue });
     } catch (error) {
-      setFaceDetection(!newValue); // Revert if backend fails
-      Alert.alert("Connection Error", "Failed to update device settings. Please check your network.");
+      setFaceDetection(!newValue);
+      Alert.alert("Connection Error", "Failed to update device settings.");
     }
+  };
+
+  const handleUnlink = () => {
+    Alert.alert("Unlink Device", "Are you sure you want to unlink this device?", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Unlink",
+        style: "destructive",
+        onPress: async () => {
+          try {
+            const user = JSON.parse(await AsyncStorage.getItem("user"));
+            const userId = user.user_id || user.id;
+
+            const res = await fetch(`${API_BASE_URL}/devices/unlink`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ device_id: linkedDevice, user_id: userId })
+            });
+
+            if (!res.ok) {
+              Alert.alert("Error", "Failed to unlink device.");
+              return;
+            }
+
+            setLinkedDevice(null);
+            const updated = { ...user, device_id: null };
+            await AsyncStorage.setItem("user", JSON.stringify(updated));
+            Alert.alert("Unlinked", "Device has been unlinked from your account.");
+          } catch (err) {
+            console.log("Unlink error:", err);
+            Alert.alert("Error", "Something went wrong.");
+          }
+        }
+      }
+    ]);
   };
 
   return (
     <View style={styles.container}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-
         <Animated.View style={{ opacity: fadeAnim, transform: [{ translateY: slideAnim }] }}>
 
-          {/* Section 1: AI Capabilities */}
+          {/* Section 1: Vision Modules */}
           <Text style={styles.sectionHeader}>Vision Modules</Text>
           <View style={styles.card}>
             <SettingToggle
               icon="scan-outline"
               title="Object Detection"
               value={objectDetection}
-              onValueChange={handleObjectDetectionToggle} // ✅ Attached backend function
+              onValueChange={handleObjectDetectionToggle}
             />
             <View style={styles.divider} />
             <SettingToggle
               icon="happy-outline"
               title="Face Recognition"
               value={faceDetection}
-              onValueChange={handleFaceDetectionToggle} // ✅ Attached backend function
+              onValueChange={handleFaceDetectionToggle}
               isLast
             />
           </View>
 
-          {/* Section 2: Audio & Patient Comfort */}
+          {/* Section 2: Audio & Comfort */}
           <Text style={styles.sectionHeader}>Audio & Comfort</Text>
           <View style={styles.card}>
             <SettingToggle
@@ -130,7 +172,7 @@ export default function SettingsScreen({ navigation }) {
             />
             <View style={styles.divider} />
             <SettingLink
-              icon="person-voice-outline"
+              icon="person-outline"
               title="Voice Profile"
               valueText={voices[voiceIndex]}
               onPress={cycleVoice}
@@ -148,12 +190,31 @@ export default function SettingsScreen({ navigation }) {
           {/* Section 3: Device Management */}
           <Text style={styles.sectionHeader}>Device Management</Text>
           <View style={styles.card}>
-            <SettingLink
-              icon="hardware-chip-outline"
-              title="Device Information"
-              onPress={() => Alert.alert("Device Info", "MAC: B8:27:EB:4A:9C\nIP: 192.168.1.105\nFirmware: 1.0.4")}
-              isLast
-            />
+            {linkedDevice ? (
+              <>
+                <SettingLink
+                  icon="hardware-chip-outline"
+                  title="Linked Device"
+                  valueText={linkedDevice}
+                  onPress={() => {}}
+                />
+                <View style={styles.divider} />
+                <SettingLink
+                  icon="log-out-outline"
+                  title="Unlink Device"
+                  isDestructive
+                  onPress={handleUnlink}
+                  isLast
+                />
+              </>
+            ) : (
+              <SettingLink
+                icon="hardware-chip-outline"
+                title="Link a Device"
+                onPress={() => navigation.navigate("DeviceLink")}
+                isLast
+              />
+            )}
           </View>
 
           {/* Section 4: Account */}

@@ -78,7 +78,7 @@ export default function SignInScreen({ navigation }) {
             <View style={styles.logoPlaceholder} />
             
             <Text style={styles.title}>Welcome Back</Text>
-            <Text style={styles.subtitle}>Sign in to manage Cognia controls.</Text>
+            <Text style={styles.subtitle}>Sign in to manage controls.</Text>
 
             <View style={styles.formContainer}>
               <AppInput
@@ -104,7 +104,7 @@ export default function SignInScreen({ navigation }) {
             ) : null}
 
             <AppButton title="Sign In" onPress={handleSignIn} />
-
+            {
             <Pressable
               onPress={() => navigation.navigate('SignUp')}
               style={styles.linkContainer}
@@ -114,7 +114,7 @@ export default function SignInScreen({ navigation }) {
                 <Text style={styles.linkBold}>Sign Up</Text>
               </Text>
             </Pressable>
-
+              }
           </Animated.View>
         </View>
       </TouchableWithoutFeedback>

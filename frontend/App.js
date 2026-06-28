@@ -14,6 +14,7 @@ import AlertsScreen from './screens/AlertsScreen';
 import ProfileScreen from './screens/ProfileScreen';
 import { AlertsProvider } from './context/AlertsContext';
 import TopAlertBanner from './components/TopAlertBanner';
+import DeviceLinkScreen from './screens/DeviceLinkScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -36,6 +37,7 @@ export default function App() {
               <Stack.Screen name="Routines" component={RoutinesScreen} />
               <Stack.Screen name="Alerts" component={AlertsScreen} />
               <Stack.Screen name="Profile" component={ProfileScreen} />
+              <Stack.Screen name="DeviceLink" component={DeviceLinkScreen} />
             </Stack.Navigator>
           </NavigationContainer>
           <TopAlertBanner />
