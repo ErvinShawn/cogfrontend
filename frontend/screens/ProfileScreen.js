@@ -2,6 +2,7 @@ import { View, Text, Image, ScrollView, Pressable } from 'react-native';
 import { useMemo } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import styles from '../styles/screens/ProfileScreenStyles';
+import {SafeAreaView} from 'react-native-safe-area-context';
 
 const DetailRow = ({ label, value, icon }) => (
   <View style={styles.detailRow}>
@@ -24,7 +25,7 @@ export default function ProfileScreen({ route, navigation }) {
   }, [deviceData]);
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <Pressable style={styles.backBtn} onPress={() => navigation.goBack()}>
           <Ionicons name="chevron-back" size={20} color="#0F172A" />
@@ -62,6 +63,6 @@ export default function ProfileScreen({ route, navigation }) {
           <DetailRow label="Monitoring Zone" value={user.zone || '-'} icon="shield-checkmark-outline" />
         </View>
       </ScrollView>
-    </View>
+    </SafeAreaView>
   );
 }

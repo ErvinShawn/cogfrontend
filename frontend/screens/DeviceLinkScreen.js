@@ -1,4 +1,5 @@
 import { View, Text, FlatList, Pressable, ActivityIndicator, Alert } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useState, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_BASE_URL } from '../config';
@@ -14,7 +15,8 @@ export default function DeviceLinkScreen({ navigation }) {
     try {
       setIsLoading(true);
       const res = await fetch(`${API_BASE_URL}/devices/available`);
-      setDevices(await res.json());
+      const data = await res.json();
+      setDevices(Array.isArray(data) ? data : []);
     } catch {
       Alert.alert("Error", "Could not fetch devices.");
     } finally {
@@ -51,53 +53,55 @@ export default function DeviceLinkScreen({ navigation }) {
   };
 
   if (isLoading) return (
-    <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+    <SafeAreaView style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F8FAFC' }}>
       <ActivityIndicator size="large" color="#10B981" />
       <Text style={{ marginTop: 12, color: '#64748B' }}>Scanning for devices...</Text>
-    </View>
+    </SafeAreaView>
   );
 
   return (
-    <View style={{ flex: 1, backgroundColor: '#F8FAFC', padding: 24 }}>
-      <Text style={{ fontSize: 22, fontWeight: 'bold', color: '#0F172A', marginBottom: 8 }}>Link Device</Text>
-      <Text style={{ color: '#64748B', marginBottom: 24 }}>Select the Cognia device to link to your account.</Text>
+    <SafeAreaView style={{ flex: 1, backgroundColor: '#F8FAFC' }} edges={['top']}>
+      <View style={{ flex: 1, padding: 24 }}>
+        <Text style={{ fontSize: 22, fontWeight: 'bold', color: '#0F172A', marginBottom: 8 }}>Link Device</Text>
+        <Text style={{ color: '#64748B', marginBottom: 24 }}>Select the Cognia device to link to your account.</Text>
 
-      {devices.length === 0 ? (
-        <View style={{ alignItems: 'center', marginTop: 60 }}>
-          <Text style={{ color: '#94A3B8' }}>No unlinked devices found.</Text>
-          <Text style={{ color: '#94A3B8', fontSize: 12, marginTop: 4 }}>Make sure the device is powered on.</Text>
-          <Pressable onPress={fetchAvailableDevices} style={{ marginTop: 20 }}>
-            <Text style={{ color: '#10B981', fontWeight: 'bold' }}>Refresh</Text>
-          </Pressable>
-        </View>
-      ) : (
-        <FlatList
-          data={devices}
-          keyExtractor={i => i.device_id}
-          renderItem={({ item }) => (
-            <View style={{
-              backgroundColor: '#FFF', borderRadius: 12, padding: 16,
-              marginBottom: 12, flexDirection: 'row',
-              justifyContent: 'space-between', alignItems: 'center',
-              elevation: 2
-            }}>
-              <View>
-                <Text style={{ fontWeight: '600', color: '#0F172A' }}>{item.device_id}</Text>
-                <Text style={{ color: '#10B981', fontSize: 12, marginTop: 2 }}>● Online</Text>
+        {devices.length === 0 ? (
+          <View style={{ alignItems: 'center', marginTop: 60 }}>
+            <Text style={{ color: '#94A3B8' }}>No unlinked devices found.</Text>
+            <Text style={{ color: '#94A3B8', fontSize: 12, marginTop: 4 }}>Make sure the device is powered on.</Text>
+            <Pressable onPress={fetchAvailableDevices} style={{ marginTop: 20 }}>
+              <Text style={{ color: '#10B981', fontWeight: 'bold' }}>Refresh</Text>
+            </Pressable>
+          </View>
+        ) : (
+          <FlatList
+            data={devices}
+            keyExtractor={i => i.device_id}
+            renderItem={({ item }) => (
+              <View style={{
+                backgroundColor: '#FFF', borderRadius: 12, padding: 16,
+                marginBottom: 12, flexDirection: 'row',
+                justifyContent: 'space-between', alignItems: 'center',
+                elevation: 2
+              }}>
+                <View>
+                  <Text style={{ fontWeight: '600', color: '#0F172A' }}>{item.device_id}</Text>
+                  <Text style={{ color: '#10B981', fontSize: 12, marginTop: 2 }}>● Online</Text>
+                </View>
+                <Pressable
+                  onPress={() => linkDevice(item.device_id)}
+                  disabled={!!linking}
+                  style={{ backgroundColor: '#10B981', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 8, opacity: linking ? 0.6 : 1 }}
+                >
+                  {linking === item.device_id
+                    ? <ActivityIndicator color="#FFF" size="small" />
+                    : <Text style={{ color: '#FFF', fontWeight: 'bold' }}>Link</Text>}
+                </Pressable>
               </View>
-              <Pressable
-                onPress={() => linkDevice(item.device_id)}
-                disabled={!!linking}
-                style={{ backgroundColor: '#10B981', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 8, opacity: linking ? 0.6 : 1 }}
-              >
-                {linking === item.device_id
-                  ? <ActivityIndicator color="#FFF" size="small" />
-                  : <Text style={{ color: '#FFF', fontWeight: 'bold' }}>Link</Text>}
-              </Pressable>
-            </View>
-          )}
-        />
-      )}
-    </View>
+            )}
+          />
+        )}
+      </View>
+    </SafeAreaView>
   );
 }

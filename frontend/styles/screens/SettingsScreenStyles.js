@@ -8,6 +8,7 @@ export default StyleSheet.create({
   },
   content: {
     padding: 16,
+    paddingTop: 60, // Gives breathing room at the top
     paddingBottom: 40,
   },
   sectionHeader: {

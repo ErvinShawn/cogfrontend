@@ -33,8 +33,20 @@ export default StyleSheet.create({
     marginBottom: 32,
   },
   formContainer: {
-    marginBottom: 24,
-    gap: 16, // Adds perfect spacing between inputs if AppInput doesn't have margins
+    marginBottom: 16,
+    gap: 16, 
+  },
+  errorContainer: {
+    backgroundColor: '#FEE2E2',
+    padding: 12,
+    borderRadius: 12,
+    marginBottom: 16,
+  },
+  errorText: {
+    color: '#DC2626',
+    fontSize: 14,
+    fontFamily: 'Inter',
+    fontWeight: '500',
   },
   linkContainer: {
     paddingVertical: 16,

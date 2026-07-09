@@ -17,7 +17,7 @@ export default function SignUpScreen({ navigation }) {
   const [condition, setCondition] = useState("")
   const [contact, setContact] = useState("")
   const [photo, setPhoto] = useState(null)
-
+  const [error, setError] = useState("")
   useEffect(() => {
     Animated.parallel([
       Animated.timing(fadeAnim, { toValue: 1, duration: 600, useNativeDriver: true }),
@@ -51,58 +51,39 @@ export default function SignUpScreen({ navigation }) {
   }
 }
 
-  const handleSignup = async () => {
+const handleSignup = async () => {
   try {
+    setError("")
     let imageUrl = null
 
-    // 1️⃣ Upload image to Cloudinary first
     if (photo) {
       const cloudData = new FormData()
-
-      cloudData.append("file", {
-        uri: photo.uri,
-        type: "image/jpeg",
-        name: "upload.jpg"
-      })
-
+      cloudData.append("file", { uri: photo.uri, type: "image/jpeg", name: "upload.jpg" })
       cloudData.append("upload_preset", "Test_Preset")
-
-      const cloudRes = await fetch(
-        "https://api.cloudinary.com/v1_1/diq0bcrjl/image/upload",
-        {
-          method: "POST",
-          body: cloudData
-        }
-      )
-
+      const cloudRes = await fetch("https://api.cloudinary.com/v1_1/diq0bcrjl/image/upload", { method: "POST", body: cloudData })
       const cloudJson = await cloudRes.json()
-      console.log("Cloudinary response:", cloudJson)
       imageUrl = cloudJson.secure_url
     }
-    console.log("Image URL:", imageUrl)
-    
+
     const res = await fetch(`${API_BASE_URL}/auth/signup`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        patient_name: patientName,
-        email,
-        password,
-        medical_condition: condition,
-        emergency_contact: contact,
-        profile_photo_url: imageUrl
-      })
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ patient_name: patientName, email, password, medical_condition: condition, emergency_contact: contact, profile_photo_url: imageUrl })
     })
 
-    const data = await res.json()
-    console.log(data)
-    await AsyncStorage.setItem("user", JSON.stringify(data));
-    await registerPushToken(data.user_id); // add this
-    navigation.replace("Main");
+    const raw = await res.text()
+    let data = {}
+    try { data = raw ? JSON.parse(raw) : {} } catch { setError("Unexpected server response."); return; }
+
+    if (!res.ok) { setError(data.error || data.detail || "Signup failed. Please try again."); return; }
+    if (data.error) { setError(data.error); return; }
+
+    await AsyncStorage.setItem("user", JSON.stringify(data))
+    await registerPushToken(data.user_id)
+    navigation.replace("Main")
   } catch (err) {
     console.log("Signup error:", err)
+    setError(`Network error. Check backend at ${API_BASE_URL}.`)
   }
 }
 
@@ -179,9 +160,10 @@ export default function SignUpScreen({ navigation }) {
             />
           )}
         </View>
-
+          
         <View style={styles.buttonWrapper}>
-          <AppButton title="Complete Sign Up" onPress={handleSignup} />
+        {error ? <Text style={{ color: "red", marginBottom: 10 }}>{error}</Text> : null}
+        <AppButton title="Complete Sign Up" onPress={handleSignup} />
         </View>
 
         <Pressable

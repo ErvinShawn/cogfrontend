@@ -72,8 +72,13 @@ export default function SettingsScreen({ navigation }) {
       fetch(`${API_BASE_URL}/devices/user/${userId}`)
         .then(r => r.json())
         .then(data => {
-          if (data.length > 0) setLinkedDevice(data[0].device_id);
-        })
+            if (data.length > 0) {
+              const d = data[0];
+              setLinkedDevice(d.device_id);
+              setVoicePrompts(d.voice_prompts ?? true);
+              setQuietHours(d.quiet_hours ?? false);
+            }
+          })
         .catch(err => console.log("Failed to load linked device:", err));
     });
   }, []);
@@ -85,17 +90,37 @@ export default function SettingsScreen({ navigation }) {
   const handleObjectDetectionToggle = async (newValue) => {
     setObjectDetection(newValue);
     try {
-      await deviceService.updateDevice(linkedDevice || "pi_001", { object_detection: newValue });
+      await deviceService.updateDevice(linkedDevice || "pi_002", { object_detection: newValue });
     } catch (error) {
       setObjectDetection(!newValue);
       Alert.alert("Connection Error", "Failed to update device settings.");
     }
   };
 
+  const handleVoicePromptsToggle = async (newValue) => {
+  setVoicePrompts(newValue);
+  try {
+    await deviceService.updateDevice(linkedDevice || "pi_002", { voice_prompts: newValue });
+  } catch {
+    setVoicePrompts(!newValue);
+    Alert.alert("Connection Error", "Failed to update device settings.");
+  }
+};
+
+const handleQuietHoursToggle = async (newValue) => {
+  setQuietHours(newValue);
+  try {
+    await deviceService.updateDevice(linkedDevice || "pi_002", { quiet_hours: newValue });
+  } catch {
+    setQuietHours(!newValue);
+    Alert.alert("Connection Error", "Failed to update device settings.");
+  }
+};
+
   const handleFaceDetectionToggle = async (newValue) => {
     setFaceDetection(newValue);
     try {
-      await deviceService.updateDevice(linkedDevice || "pi_001", { face_detection: newValue });
+      await deviceService.updateDevice(linkedDevice || "pi_002", { face_detection: newValue });
     } catch (error) {
       setFaceDetection(!newValue);
       Alert.alert("Connection Error", "Failed to update device settings.");
@@ -168,7 +193,7 @@ export default function SettingsScreen({ navigation }) {
               icon="volume-high-outline"
               title="Voice Prompts"
               value={voicePrompts}
-              onValueChange={setVoicePrompts}
+              onValueChange={handleVoicePromptsToggle}  // ✅
             />
             <View style={styles.divider} />
             <SettingLink
@@ -182,8 +207,7 @@ export default function SettingsScreen({ navigation }) {
               icon="moon-outline"
               title="Quiet Hours (10 PM - 6 AM)"
               value={quietHours}
-              onValueChange={setQuietHours}
-              isLast
+              onValueChange={handleQuietHoursToggle}  // ✅
             />
           </View>
 

@@ -47,7 +47,7 @@ export default function RoutinesScreen() {
   const [showPicker, setShowPicker] = useState(false); 
   const [editingIndex, setEditingIndex] = useState(null); // ✅ Tracks if updating vs adding
   const [userId, setUserId] = useState(null);
-
+  const [deviceId, setDeviceId] = useState("pi_002");
   const buttonScale = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
@@ -55,6 +55,7 @@ export default function RoutinesScreen() {
       const u = JSON.parse(str);
       const id = u.user_id || u.id;
       setUserId(id);
+      setDeviceId(u.device_id || "pi_002"); // add this
     });
   }, []);
 
@@ -114,7 +115,7 @@ export default function RoutinesScreen() {
       if (editingIndex !== null) {
         await routineService.updateReminder(userId, editingIndex, stepData);
       } else {
-        await routineService.saveReminder("pi_001", userId, stepData);
+        await routineService.saveReminder(deviceId, userId, stepData);
       }
       
       await loadRoutines(); // Refresh to ensure sync

@@ -9,19 +9,21 @@ import { registerPushToken } from '../services/notification';
 
 export default function SignInScreen({ navigation }) {
   const fadeAnim = useRef(new Animated.Value(0)).current;
-  const slideAnim = useRef(new Animated.Value(30)).current;
+  const slideAnim = useRef(new Animated.Value(20)).current; // Slightly reduced for a smoother snap effect
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     Animated.parallel([
-      Animated.timing(fadeAnim, { toValue: 1, duration: 600, useNativeDriver: true }),
-      Animated.spring(slideAnim, { toValue: 0, tension: 40, friction: 7, useNativeDriver: true })
+      Animated.timing(fadeAnim, { toValue: 1, duration: 500, useNativeDriver: true }),
+      Animated.spring(slideAnim, { toValue: 0, tension: 50, friction: 8, useNativeDriver: true })
     ]).start();
   }, []);
 
   const handleSignIn = async () => {
+    if (loading) return;
     try {
       setError("");
       const normalizedEmail = email.trim().toLowerCase();
@@ -32,6 +34,7 @@ export default function SignInScreen({ navigation }) {
         return;
       }
 
+      setLoading(true);
       const res = await fetch(`${API_BASE_URL}/auth/signin`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -57,14 +60,17 @@ export default function SignInScreen({ navigation }) {
       }
 
       await AsyncStorage.setItem("user", JSON.stringify(data));
-      await registerPushToken(data.user_id); // add this — runs after login, before navigation
+      await registerPushToken(data.user_id);
       navigation.replace("Main");
 
     } catch (err) {
       console.log("Login error:", err);
-      setError(`Network error. Check backend at ${API_BASE_URL}.`);
+      setError("Network error. Please check your connection.");
+    } finally {
+      setLoading(false);
     }
   };
+
   return (
     <KeyboardAvoidingView 
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'} 
@@ -72,9 +78,8 @@ export default function SignInScreen({ navigation }) {
     >
       <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
         <View style={styles.container}>
-          
           <Animated.View style={{ opacity: fadeAnim, transform: [{ translateY: slideAnim }] }}>
-
+            
             <View style={styles.logoPlaceholder} />
             
             <Text style={styles.title}>Welcome Back</Text>
@@ -92,19 +97,24 @@ export default function SignInScreen({ navigation }) {
               <AppInput
                 placeholder="Password"
                 secureTextEntry
+                isPassword={true} // Triggers the show/hide feature inside the component
                 value={password}
                 onChangeText={setPassword}
               />
             </View>
 
             {error ? (
-              <Text style={{ color: "red", marginBottom: 10 }}>
-                {error}
-              </Text>
+              <View style={styles.errorContainer}>
+                <Text style={styles.errorText}>{error}</Text>
+              </View>
             ) : null}
 
-            <AppButton title="Sign In" onPress={handleSignIn} />
-            {
+            <AppButton 
+              title={loading ? "Signing In..." : "Sign In"} 
+              onPress={handleSignIn} 
+              disabled={loading}
+            />
+
             <Pressable
               onPress={() => navigation.navigate('SignUp')}
               style={styles.linkContainer}
@@ -114,7 +124,6 @@ export default function SignInScreen({ navigation }) {
                 <Text style={styles.linkBold}>Sign Up</Text>
               </Text>
             </Pressable>
-              }
           </Animated.View>
         </View>
       </TouchableWithoutFeedback>

@@ -7,7 +7,7 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: 20,
-    paddingTop: 12,
+    paddingTop: 15,
   },
 
   backBtn: {
